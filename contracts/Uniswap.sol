@@ -1,22 +1,25 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "../interfaces/ISwapping.sol";
-import "hardhat/console.sol";
+import "../interfaces/ISwappingRouter.sol";
+import "../interfaces/ISwappingERC20.sol";
 
 contract Uniswap {
-    ISwapping public routerFactory;
-    ISwapping public daiFactory;
-    ISwapping public wethFactory;
+    ISwappingRouter public routerFactory;
+    ISwappingERC20 public DAI;
+    ISwappingERC20 public WETH;
+    ISwappingERC20 public USDT;
 
     constructor(
         address _routerfactory,
-        address _daiFactory,
-        address _wethFactory
+        address _DAIAddress,
+        address _WETHAddress,
+        address _USDTAddress
     ) {
-        routerFactory = ISwapping(_routerfactory);
-        daiFactory = ISwapping(_daiFactory);
-        wethFactory = ISwapping(_wethFactory);
+        routerFactory = ISwappingRouter(_routerfactory);
+        DAI = ISwappingERC20(_DAIAddress);
+        WETH = ISwappingERC20(_WETHAddress);
+        USDT = ISwappingERC20(_USDTAddress);
     }
 
     function getAmountIn(uint256 amountOutMin)
@@ -25,7 +28,7 @@ contract Uniswap {
         returns (uint256[] memory)
     {
         address[] memory path = new address[](2);
-        path[0] = address(daiFactory);
+        path[0] = address(DAI);
         path[1] = routerFactory.WETH();
 
         uint256[] memory amountIn = routerFactory.getAmountsIn(
@@ -38,7 +41,6 @@ contract Uniswap {
 
     function SwapTokentoETH(uint256 MinAmountOfToken)
         public
-        payable
         returns (uint256[] memory)
     {
         uint256 amountOutMin = MinAmountOfToken;
@@ -46,17 +48,17 @@ contract Uniswap {
         uint256 amountIn = amountInArray[0];
 
         require(
-            daiFactory.transferFrom(msg.sender, address(this), amountIn),
+            DAI.transferFrom(msg.sender, address(this), amountIn),
             "transferFrom failed."
         );
 
         require(
-            daiFactory.approve(address(routerFactory), amountIn),
+            DAI.approve(address(routerFactory), amountIn),
             "approve failed."
         );
 
         address[] memory path = new address[](2);
-        path[0] = address(daiFactory);
+        path[0] = address(DAI);
         path[1] = routerFactory.WETH();
 
         uint256[] memory amounts = routerFactory.swapExactTokensForETH(
@@ -72,7 +74,6 @@ contract Uniswap {
 
     function SwapTokentoToken(uint256 MinAmountOfToken)
         public
-        payable
         returns (uint256[] memory)
     {
         uint256 amountOutMin = MinAmountOfToken;
@@ -80,22 +81,59 @@ contract Uniswap {
         uint256 amountIn = amountInArray[0];
 
         require(
-            daiFactory.transferFrom(msg.sender, address(this), amountIn),
+            DAI.transferFrom(msg.sender, address(this), amountIn),
             "transferFrom failed."
         );
 
         require(
-            daiFactory.approve(address(routerFactory), amountIn),
+            DAI.approve(address(routerFactory), amountIn),
             "approve failed."
         );
 
         address[] memory path = new address[](2);
-        path[0] = address(daiFactory);
+        path[0] = address(DAI);
         path[1] = routerFactory.WETH();
 
-    console.log("msg.sender -> ", msg.sender);
         uint256[] memory amounts = routerFactory.swapExactTokensForTokens(
             amountIn,
+            amountOutMin,
+            path,
+            msg.sender,
+            block.timestamp
+        );
+
+        return amounts;
+    }
+
+    function getETHToSwap(uint256 amountOutMin)
+        public
+        view
+        returns (uint256[] memory amount)
+    {
+        address[] memory path = new address[](2);
+        path[0] = routerFactory.WETH();
+        path[1] = address(USDT);
+
+        uint256[] memory amountIn = routerFactory.getAmountsIn(
+            amountOutMin,
+            path
+        );
+
+        return amountIn;
+    }
+
+    function SwapETHtoToken(uint256 MinAmountOfToken)
+        public
+        payable
+        returns (uint256[] memory)
+    {
+        uint256 amountOutMin = MinAmountOfToken;
+
+        address[] memory path = new address[](2);
+        path[0] = routerFactory.WETH();
+        path[1] = address(USDT);
+
+        uint256[] memory amounts = routerFactory.swapExactETHForTokens{ value : msg.value }(
             amountOutMin,
             path,
             msg.sender,
