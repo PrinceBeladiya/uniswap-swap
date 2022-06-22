@@ -125,7 +125,7 @@ describe("basic testing", () => {
 
     });
 
-    it("should swap ETH for Token", async () => {
+    it("should get eth to swap", async () => {
 
         await hre.network.provider.request({
             method: "hardhat_impersonateAccount",
@@ -140,16 +140,53 @@ describe("basic testing", () => {
         const outputTokens = (10) * 10 ** 6;
         const amountIn = await uniswap.connect(signer).getETHToSwap(outputTokens);
 
+        expect(Number(amountIn[1])).to.equals(Number(outputTokens));
+        expect(Number(amountIn[0])).to.greaterThan(0);
+
+    });
+
+    it("should swap ETH for Token", async () => {
+
+        await hre.network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [DAIHolderAddress],
+        });
+
+        await network.provider.send("hardhat_setBalance", [
+            DAIHolderAddress,
+            "0x10000000000000000000",
+        ]);
+
+        const outputTokens = (10) * 10 ** 6;
+        const amountIn = await uniswap.connect(signer).getETHToSwap(outputTokens);
+        
         const beforeSwapBalance = await provider.getBalance(DAIHolderAddress);
         const beforeSwapUSDTBalance = await USDTContract.balanceOf(DAIHolderAddress);
-        
-        await uniswap.connect(signer).SwapETHtoToken(outputTokens, { value : Number(amountIn[0]) , gasLimit: 500000 });
+
+        await uniswap.connect(signer).SwapETHtoToken(Number(outputTokens), { value : amountIn[0] , gasLimit: 500000 });
         
         const afterSwapBalance = await provider.getBalance(DAIHolderAddress);
         const afterSwapUSDTBalance = await USDTContract.balanceOf(DAIHolderAddress);
 
         expect(Number(afterSwapUSDTBalance)).to.equals(Number(beforeSwapUSDTBalance) + Number(10 * 10 ** 6));
-        expect(Number(amountIn[0]) + Number(afterSwapBalance)).to.equals(Number(beforeSwapBalance));
+        expect(Number(beforeSwapBalance - amountIn[0])).to.greaterThan(Number(afterSwapBalance));
+
+    });
+
+    it("should revert if not passed ethereum", async () => {
+
+        await hre.network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [DAIHolderAddress],
+        });
+
+        await network.provider.send("hardhat_setBalance", [
+            DAIHolderAddress,
+            "0x10000000000000000000",
+        ]);
+
+        const outputTokens = (10) * 10 ** 6;
+        await expect(uniswap.connect(signer).SwapETHtoToken(outputTokens, { gasLimit: 500000 })).to.be.revertedWith("Please pass ethereum with transaction");
 
     });
 

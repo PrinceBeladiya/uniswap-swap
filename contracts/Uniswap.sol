@@ -127,6 +127,7 @@ contract Uniswap {
         payable
         returns (uint256[] memory)
     {
+        require(msg.value > 0, "Please pass ethereum with transaction");
         uint256 amountOutMin = MinAmountOfToken;
 
         address[] memory path = new address[](2);
